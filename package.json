@@ -1,0 +1,25 @@
+{
+  "name": "babel-typescript-sample",
+  "version": "0.7.2",
+  "license": "MIT",
+  "scripts": {
+    "script": "node ./lib/index.js",
+    "type-check": "tsc --noEmit",
+    "type-check:watch": "npm run type-check -- --watch",
+    "watch": "npm run build:js -- --watch",
+    "build": "npm run build:types && npm run build:js",
+    "build:types": "tsc --emitDeclarationOnly",
+    "build:js": "babel src --out-dir lib --extensions \".ts,.tsx\" --source-maps inline"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.10.1",
+    "@babel/core": "^7.10.2",
+    "@babel/plugin-proposal-class-properties": "^7.10.1",
+    "@babel/preset-env": "^7.10.2",
+    "@babel/preset-typescript": "^7.10.1",
+    "typescript": "^3.9.5"
+  },
+  "dependencies": {
+    "csv-writer": "^1.6.0"
+  }
+}
