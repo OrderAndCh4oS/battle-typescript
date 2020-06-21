@@ -180,7 +180,67 @@ const getInitiative = (actor: Actor, remainder: number): number => actor.intelli
 
 const getRoll = () => Math.round(Math.random() * 100)
 
-const getArmour = (actor: Actor) => actor.armour.value;
+const getBluntEdgeArmourReduction = (armour: Armour): number => {
+    switch (armour.material) {
+        case ArmourType.none:
+            return armour.value
+        case ArmourType.padded:
+            return armour.value
+        case ArmourType.leather:
+            return armour.value * 0.85
+        case ArmourType.mail:
+            return armour.value * 0.9
+        case ArmourType.plate:
+            return armour.value * 0.95
+    }
+};
+
+const getPierceEdgeArmourReduction = (armour: Armour): number => {
+    switch (armour.material) {
+        case ArmourType.none:
+            return armour.value
+        case ArmourType.padded:
+            return armour.value * 0.5
+        case ArmourType.leather:
+            return armour.value * 0.66
+        case ArmourType.mail:
+            return armour.value * 0.75
+        case ArmourType.plate:
+            return armour.value * 0.85
+    }
+};
+
+// none, // armour reduction 0
+// padded, // armour reduction effectiveness blunt: 100%, slash: 80%, pierce: 50%
+// leather, // armour reduction effectiveness blunt: 85%, slash: 100%, pierce: 66%
+// mail, // armour reduction effectiveness blunt: 90%, slash: 100%, pierce: 75%
+// plate// armour reduction effectiveness blunt: 95%, slash: 100%, pierce: 85%
+
+const getSlashEdgeArmourReduction = (armour: Armour): number => {
+    switch (armour.material) {
+        case ArmourType.none:
+            return armour.value
+        case ArmourType.padded:
+            return armour.value * 0.75
+        case ArmourType.leather:
+            return armour.value
+        case ArmourType.mail:
+            return armour.value
+        case ArmourType.plate:
+            return armour.value
+    }
+};
+
+const getArmourReduction = (armour: Armour, weapon: Weapon) => {
+    switch (weapon.edge) {
+        case EdgeType.blunt:
+            return getBluntEdgeArmourReduction(armour);
+        case EdgeType.pierce:
+            return getPierceEdgeArmourReduction(armour);
+        case EdgeType.slash:
+            return getSlashEdgeArmourReduction(armour);
+    }
+}
 
 const makeCombatant = (character: Character) => {
     const {attacks, attackRemainder} = getAttacks(character.actor);
@@ -315,7 +375,6 @@ const getDamage = (attacker: Combatant, defender: Combatant) => {
 }
 
 const getBaseDamage = (attacker: Character) => {
-    // Todo: handle variations between armour/weapon types
     const baseDamage = attacker.actor.mainHand.damage + ("damage" in attacker.actor.offHand ? attacker.actor.offHand.damage : 0) + attacker.actor.strength / 5;
     return baseDamage - (Math.random() * baseDamage / ("damage" in attacker.actor.offHand ? 4 : 5));
 }
@@ -364,7 +423,7 @@ const battle = (characterOne: Character, characterTwo: Character) => {
     let turn = 1;
     while (true) {
         console.log('---Attack Start---');
-        // Todo: implement some form of chain
+        // Todo: implement some form of action command chain
         console.log(`${attacker.character.name}\nattacks: ${attacker.attacks},\nremainder: ${attacker.attackRemainder}\ninitiative: ${attacker.initiative}\nweight: ${attacker.weight}\nhealth: ${attacker.health}`);
         console.log(`${defender.character.name}\nattacks: ${defender.attacks},\nremainder: ${defender.attackRemainder}\ninitiative: ${defender.initiative}\nweight: ${defender.weight}\nhealth: ${defender.health}`);
         console.log('.................');
@@ -382,7 +441,7 @@ const battle = (characterOne: Character, characterTwo: Character) => {
         if (isHit && !isDodge) {
             // Todo: apply armour reduction based on weapon/armour type
             const {criticalHitChance, criticalHitRoll, isCriticalHit, damage} = getDamage(attacker, defender);
-            const armourReduction = getArmour(defender.character.actor);
+            const armourReduction = getArmourReduction(defender.character.actor.armour, attacker.character.actor.mainHand);
 
             console.log(`${attacker.character.name} critical hit roll: required ${criticalHitChance}, rolled ${criticalHitRoll}`);
             console.log(isCriticalHit ? 'Critical hit success' : 'Critical hit failure');
