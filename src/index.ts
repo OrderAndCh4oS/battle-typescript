@@ -17,11 +17,11 @@ enum EdgeType {
 }
 
 enum ArmourType {
-    none, // armour reduction 0
-    padded, // armour reduction effectiveness blunt: 100%, slash: 80%, pierce: 50%
-    leather, // armour reduction effectiveness blunt: 85%, slash: 100%, pierce: 66%
-    mail, // armour reduction effectiveness blunt: 90%, slash: 100%, pierce: 75%
-    plate// armour reduction effectiveness blunt: 95%, slash: 100%, pierce: 85%
+    none,
+    padded,
+    leather,
+    mail,
+    plate
 }
 
 interface Weapon {
@@ -210,12 +210,6 @@ const getPierceEdgeArmourReduction = (armour: Armour): number => {
             return armour.value * 0.85
     }
 };
-
-// none, // armour reduction 0
-// padded, // armour reduction effectiveness blunt: 100%, slash: 80%, pierce: 50%
-// leather, // armour reduction effectiveness blunt: 85%, slash: 100%, pierce: 66%
-// mail, // armour reduction effectiveness blunt: 90%, slash: 100%, pierce: 75%
-// plate// armour reduction effectiveness blunt: 95%, slash: 100%, pierce: 85%
 
 const getSlashEdgeArmourReduction = (armour: Armour): number => {
     switch (armour.material) {
@@ -484,7 +478,7 @@ const battle = (characterOne: Character, characterTwo: Character) => {
         attacker.attacks--;
         const weapon = attacker.character.actor.mainHand;
         attack(attacker, defender, weapon, 'mainHand');
-        if('damage' in attacker.character.actor.offHand) {
+        if ('damage' in attacker.character.actor.offHand) {
             attack(attacker, defender, weapon, 'offHand');
         }
         if (defender.health <= 0) {
