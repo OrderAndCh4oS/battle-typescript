@@ -75,6 +75,7 @@ interface AttackStats {
     criticalHitStats?: CriticalHitStats;
     damageStats?: DamageStats;
     wasDodged?: boolean;
+    hand: string
 }
 
 interface CriticalHitStats {
@@ -280,12 +281,14 @@ const makeAttackStats = (
     isSuccessful: boolean,
     baseChance: number,
     weightChanceReduction: number,
+    hand: string
 ): AttackStats => ({
     baseChance,
     weightChanceReduction,
     chance,
     rolled,
-    isSuccessful
+    isSuccessful,
+    hand
 });
 
 const makeDodgeStats = (
@@ -364,19 +367,23 @@ const getDodgeChance = (defender: Character, attacker: Character) => {
 
 const getCriticalHitChance = (attacker: Character, defender: Character) => 90 - ((attacker.actor.intelligence - defender.actor.intelligence) / 10);
 
-const getDamage = (attacker: Combatant, defender: Combatant) => {
+const getDamage = (attacker: Combatant, defender: Combatant, weapon: Weapon) => {
     const criticalHitChance = getCriticalHitChance(attacker.character, defender.character);
     const criticalHitRoll = getRoll();
     const isCriticalHit = criticalHitRoll > criticalHitChance;
-    let damage = getBaseDamage(attacker.character);
+    let damage = getBaseDamage(attacker.character, weapon);
     damage += isCriticalHit ? damage / 2 : 0;
     damage = Math.round(damage);
     return {criticalHitChance, criticalHitRoll, isCriticalHit, damage}
 }
 
-const getBaseDamage = (attacker: Character) => {
-    const baseDamage = attacker.actor.mainHand.damage + ("damage" in attacker.actor.offHand ? attacker.actor.offHand.damage : 0) + attacker.actor.strength / 5;
-    return baseDamage - (Math.random() * baseDamage / ("damage" in attacker.actor.offHand ? 4 : 5));
+const getDamageVariability = (baseDamage: number, attacker: Character) =>
+    Math.random() * baseDamage / ("damage" in attacker.actor.offHand ? 4 : 5);
+
+const getBaseDamage = (attacker: Character, weapon: Weapon) => {
+    const strengthModifier = (attacker.actor.strength / 5) * ("damage" in attacker.actor.offHand ? 0.5 : 1);
+    const baseDamage = weapon.damage + strengthModifier;
+    return baseDamage - getDamageVariability(baseDamage, attacker);
 }
 
 const performAttack = (attacker: Combatant, defender: Combatant) => {
@@ -414,6 +421,52 @@ function blockCheck(defender: Combatant) {
     return {blockRoll, blockChance};
 }
 
+function attack(attacker: Combatant, defender: Combatant, weapon: Weapon, hand: 'mainHand' | 'offHand') {
+    const {hitChance, hitRoll, isHit, baseHitChance, weightHitChanceReduction} = performAttack(attacker, defender);
+    console.log(`${attacker.character.name} attack roll: required ${hitChance}, rolled ${hitRoll}`);
+    console.log(isHit ? 'Hit success' : 'Missed');
+    const attackStats: AttackStats = makeAttackStats(hitChance, hitRoll, isHit, baseHitChance, weightHitChanceReduction, hand);
+    const {dodgeChance, dodgeRoll, isDodge, baseDodgeChance, weightDodgeChanceReduction} = attemptDodge(defender, attacker);
+    console.log(`${defender.character.name} dodge roll: required ${dodgeChance}, rolled ${dodgeRoll}`);
+    console.log(isDodge ? 'Dodge success' : 'Dodge failure');
+    attackStats.wasDodged = isDodge;
+    const dodgeStats: DodgeStats = makeDodgeStats(dodgeChance, dodgeRoll, isDodge, baseDodgeChance, weightDodgeChanceReduction);
+    if (isHit && !isDodge) {
+        // Todo: apply armour reduction based on weapon/armour type
+        const {criticalHitChance, criticalHitRoll, isCriticalHit, damage} = getDamage(attacker, defender, weapon);
+        const armourReduction = getArmourReduction(defender.character.actor.armour, attacker.character.actor.mainHand);
+
+        console.log(`${attacker.character.name} critical hit roll: required ${criticalHitChance}, rolled ${criticalHitRoll}`);
+        console.log(isCriticalHit ? 'Critical hit success' : 'Critical hit failure');
+        attackStats.criticalHitStats = makeCriticalHitStats(criticalHitChance, criticalHitRoll, isCriticalHit);
+
+        let isBlock = false;
+
+        if ('blockChance' in defender.character.actor.offHand && defender.character.actor.offHand.durability > 0) {
+            const {blockRoll, blockChance} = blockCheck(defender);
+            isBlock = blockRoll > blockChance;
+            defender.character.actor.offHand.durability -= damage;
+            console.log(`${defender.character.name} block roll: required ${blockChance}, rolled ${blockRoll}`);
+            console.log(isBlock ? 'Block success' : 'Block failure');
+            const blockStats = makeBlockStats(blockChance, blockRoll, damage, isBlock);
+            defender.roundStats.blocks.push(blockStats);
+        }
+
+        if (!isBlock) {
+            defender.health -= damage - armourReduction;
+            console.log(`${attacker.character.name} dealt ${isCriticalHit ? 'critical damage' : 'damage'}: ${damage}`);
+            console.log(`${defender.character.name} health: ${defender.health}`);
+            attackStats.damageStats = makeDamageStats(damage, defender.character.actor.armour.material, armourReduction);
+        }
+
+        const woundStats = makeWoundStats(weapon, defender.character.actor.armour, attacker.character.actor.strength, isCriticalHit, damage, armourReduction);
+        defender.roundStats.wounds.push(woundStats);
+    }
+
+    attacker.roundStats.attacks.push(attackStats);
+    defender.roundStats.dodges.push(dodgeStats);
+}
+
 const battle = (characterOne: Character, characterTwo: Character) => {
     let combatantOne = makeCombatant(characterOne),
         combatantTwo = makeCombatant(characterTwo);
@@ -429,62 +482,24 @@ const battle = (characterOne: Character, characterTwo: Character) => {
         console.log('.................');
 
         attacker.attacks--;
-        const {hitChance, hitRoll, isHit, baseHitChance, weightHitChanceReduction} = performAttack(attacker, defender);
-        console.log(`${attacker.character.name} attack roll: required ${hitChance}, rolled ${hitRoll}`);
-        console.log(isHit ? 'Hit success' : 'Missed');
-        const attackStats: AttackStats = makeAttackStats(hitChance, hitRoll, isHit, baseHitChance, weightHitChanceReduction);
-        const {dodgeChance, dodgeRoll, isDodge, baseDodgeChance, weightDodgeChanceReduction} = attemptDodge(defender, attacker);
-        console.log(`${defender.character.name} dodge roll: required ${dodgeChance}, rolled ${dodgeRoll}`);
-        console.log(isDodge ? 'Dodge success' : 'Dodge failure');
-        attackStats.wasDodged = isDodge;
-        const dodgeStats: DodgeStats = makeDodgeStats(dodgeChance, dodgeRoll, isDodge, baseDodgeChance, weightDodgeChanceReduction);
-        if (isHit && !isDodge) {
-            // Todo: apply armour reduction based on weapon/armour type
-            const {criticalHitChance, criticalHitRoll, isCriticalHit, damage} = getDamage(attacker, defender);
-            const armourReduction = getArmourReduction(defender.character.actor.armour, attacker.character.actor.mainHand);
-
-            console.log(`${attacker.character.name} critical hit roll: required ${criticalHitChance}, rolled ${criticalHitRoll}`);
-            console.log(isCriticalHit ? 'Critical hit success' : 'Critical hit failure');
-            attackStats.criticalHitStats = makeCriticalHitStats(criticalHitChance, criticalHitRoll, isCriticalHit);
-
-            let isBlock = false;
-
-            if ('blockChance' in defender.character.actor.offHand && defender.character.actor.offHand.durability > 0) {
-                const {blockRoll, blockChance} = blockCheck(defender);
-                isBlock = blockRoll > blockChance;
-                defender.character.actor.offHand.durability -= damage;
-                console.log(`${defender.character.name} block roll: required ${blockChance}, rolled ${blockRoll}`);
-                console.log(isBlock ? 'Block success' : 'Block failure');
-                const blockStats = makeBlockStats(blockChance, blockRoll, damage, isBlock);
-                defender.roundStats.blocks.push(blockStats);
-            }
-
-            if (!isBlock) {
-                defender.health -= damage - armourReduction;
-                console.log(`${attacker.character.name} dealt ${isCriticalHit ? 'critical damage' : 'damage'}: ${damage}`);
-                console.log(`${defender.character.name} health: ${defender.health}`);
-                attackStats.damageStats = makeDamageStats(damage, defender.character.actor.armour.material, armourReduction);
-            }
-
-            // Todo: Two handed wielding should make two separate attacks.
-            const woundStats = makeWoundStats(attacker.character.actor.mainHand, defender.character.actor.armour, attacker.character.actor.strength, isCriticalHit, damage, armourReduction);
-            defender.roundStats.wounds.push(woundStats);
-            if (defender.health <= 0) {
-                winner = attacker.character.name;
-                attacker.character.wins += 1;
-                attacker.character.experience += 200;
-                defender.character.experience += 75;
-                attacker.character.gold += 10;
-                defender.character.gold += 5;
-                defender.character.losses += 1;
-                console.log(`${attacker.character.name} wins`);
-                console.log(`${attacker.character.name} health: ${attacker.health}`);
-                console.log(`${defender.character.name} health: ${defender.health}`);
-                break;
-            }
+        const weapon = attacker.character.actor.mainHand;
+        attack(attacker, defender, weapon, 'mainHand');
+        if('damage' in attacker.character.actor.offHand) {
+            attack(attacker, defender, weapon, 'offHand');
         }
-        attacker.roundStats.attacks.push(attackStats);
-        defender.roundStats.dodges.push(dodgeStats);
+        if (defender.health <= 0) {
+            winner = attacker.character.name;
+            attacker.character.wins += 1;
+            attacker.character.experience += 200;
+            defender.character.experience += 75;
+            attacker.character.gold += 10;
+            defender.character.gold += 5;
+            defender.character.losses += 1;
+            console.log(`${attacker.character.name} wins`);
+            console.log(`${attacker.character.name} health: ${attacker.health}`);
+            console.log(`${defender.character.name} health: ${defender.health}`);
+            break;
+        }
 
         // Todo: split attacks more evenly
         if (attacker.attacks < defender.attacks) {
@@ -506,12 +521,28 @@ const battle = (characterOne: Character, characterTwo: Character) => {
  * Weapons
  */
 
+const club: Weapon = {
+    name: 'club',
+    edge: EdgeType.blunt,
+    damage: 8,
+    weight: 6,
+    price: 3
+}
+
 const dagger: Weapon = {
     name: 'dagger',
     edge: EdgeType.pierce,
     damage: 10,
     weight: 5,
     price: 8
+}
+
+const cudgel: Weapon = {
+    name: 'cudgel',
+    edge: EdgeType.blunt,
+    damage: 28,
+    weight: 16,
+    price: 20
 }
 
 const hatchet: Weapon = {
@@ -592,7 +623,7 @@ const longSword: Weapon = {
 
 const buckler: Shield = {
     name: "buckler",
-    blockChance: 5,
+    blockChance: 15,
     durability: 500,
     weight: 6,
     price: 20,
@@ -600,7 +631,7 @@ const buckler: Shield = {
 
 const roundShield: Shield = {
     name: "roundShield",
-    blockChance: 10,
+    blockChance: 20,
     durability: 1000,
     weight: 20,
     price: 50,
@@ -608,7 +639,7 @@ const roundShield: Shield = {
 
 const longShield: Shield = {
     name: "longShield",
-    blockChance: 15,
+    blockChance: 25,
     durability: 1500,
     weight: 30,
     price: 80,
@@ -670,18 +701,18 @@ const actorOne: Actor = {
     intelligence: 30,
     strength: 50,
     dexterity: 70,
-    mainHand: hatchet,
+    mainHand: axe,
     offHand: buckler,
-    armour: quiltPadding,
+    armour: studdedLeatherArmour,
 }
 
 const actorTwo: Actor = {
     intelligence: 45,
     strength: 65,
     dexterity: 40,
-    mainHand: broadSword,
+    mainHand: hatchet,
     offHand: dagger,
-    armour: studdedLeatherArmour,
+    armour: quiltPadding,
 }
 
 const actorThree: Actor = {
