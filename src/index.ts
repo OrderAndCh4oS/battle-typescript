@@ -801,51 +801,51 @@ const battleResults: BattleResults[] = [
     }
 ];
 
-for (let i = 0; i < 1000; i++) {
+const getAttackRateStats = (combatant: Combatant): AttackRateStats => {
+    const name = combatant.character.name;
+    const count = combatant.roundStats.attacks.length;
+    const successCount = combatant.roundStats.attacks.filter(a => a.isSuccessful).length;
+    const successRate = Number((successCount / count).toFixed(3));
+    const criticalHitSuccessCount = combatant.roundStats.attacks.filter(a => a.criticalHitStats?.isSuccessful).length;
+    const criticalHitSuccessRate = Number((criticalHitSuccessCount / count).toFixed(3));
+    const totalDamage = combatant.roundStats.attacks.reduce((total: number, a) => total += a.damageStats ? a.damageStats.damageCaused : 0, 0);
+    const totalDamageGiven = combatant.roundStats.attacks.reduce((total: number, a) => total += a.damageStats ? a.damageStats.damageCaused - a.damageStats.damageBlockedByArmour : 0, 0);
+    const averageDamage = Math.round(totalDamage / count);
+    const averageDamageGiven = Math.round(totalDamageGiven / count);
+    return {
+        name,
+        count,
+        successCount,
+        successRate,
+        totalDamage,
+        averageDamage,
+        criticalHitSuccessCount,
+        criticalHitSuccessRate,
+        totalDamageGiven,
+        averageDamageGiven
+    };
+};
+
+const dodgeStats = (defender: Combatant): DodgeCheckStats => {
+    const name = defender.character.name;
+    const count = defender.roundStats.dodges.length;
+    const successCount = defender.roundStats.dodges.filter(d => d.isSuccessful).length;
+    const successRate = Number((successCount / count).toFixed(3));
+    return {name, count, successCount, successRate}
+}
+
+const blockStats = (combatant: Combatant): BlockCheckStats => {
+    const name = combatant.character.name;
+    const count = combatant.roundStats.blocks.length;
+    const successCount = combatant.roundStats.blocks.filter(b => b.isSuccessful).length;
+    const successRate = Number((successCount / count).toFixed(3));
+    return {name, count, successCount, successRate: !isNaN(successRate) ? successRate : 0}
+}
+
+for (let i = 0; i < 100; i++) {
     const [combatantOne, combatantTwo] = battle(characterOne, characterTwo);
 
     console.log('\n####################\n');
-
-    const getAttackRateStats = (combatant: Combatant): AttackRateStats => {
-        const name = combatant.character.name;
-        const count = combatant.roundStats.attacks.length;
-        const successCount = combatant.roundStats.attacks.filter(a => a.isSuccessful).length;
-        const successRate = Number((successCount / count).toFixed(3));
-        const criticalHitSuccessCount = combatant.roundStats.attacks.filter(a => a.criticalHitStats?.isSuccessful).length;
-        const criticalHitSuccessRate = Number((criticalHitSuccessCount / count).toFixed(3));
-        const totalDamage = combatant.roundStats.attacks.reduce((total: number, a) => total += a.damageStats ? a.damageStats.damageCaused : 0, 0);
-        const totalDamageGiven = combatant.roundStats.attacks.reduce((total: number, a) => total += a.damageStats ? a.damageStats.damageCaused - a.damageStats.damageBlockedByArmour : 0, 0);
-        const averageDamage = Math.round(totalDamage / count);
-        const averageDamageGiven = Math.round(totalDamageGiven / count);
-        return {
-            name,
-            count,
-            successCount,
-            successRate,
-            totalDamage,
-            averageDamage,
-            criticalHitSuccessCount,
-            criticalHitSuccessRate,
-            totalDamageGiven,
-            averageDamageGiven
-        };
-    };
-
-    const dodgeStats = (defender: Combatant): DodgeCheckStats => {
-        const name = defender.character.name;
-        const count = defender.roundStats.dodges.length;
-        const successCount = defender.roundStats.dodges.filter(d => d.isSuccessful).length;
-        const successRate = Number((successCount / count).toFixed(3));
-        return {name, count, successCount, successRate}
-    }
-
-    const blockStats = (combatant: Combatant): BlockCheckStats => {
-        const name = combatant.character.name;
-        const count = combatant.roundStats.blocks.length;
-        const successCount = combatant.roundStats.blocks.filter(b => b.isSuccessful).length;
-        const successRate = Number((successCount / count).toFixed(3));
-        return {name, count, successCount, successRate: !isNaN(successRate) ? successRate : 0}
-    }
 
     const combatantOneStats: CombatantStats = {
         attackRateStats: getAttackRateStats(combatantOne),
@@ -871,9 +871,10 @@ const logCharacterStats = (character: Character | undefined) => {
 };
 
 console.log(`${capitalise(battleResults[0].character?.name)} vs ${capitalise(battleResults[1].character?.name)}`);
+
 console.log('================\n');
 
-function logResults(results: CombatantStats[]) {
+const logResults = (results: CombatantStats[]) => {
     const totalDamage = results.reduce((count: number, r) => count += r.attackRateStats.totalDamage, 0);
     const totalDamageGiven = results.reduce((count: number, r) => count += r.attackRateStats.totalDamageGiven, 0);
     const totalAttacks = results.reduce((count: number, r) => count += r.attackRateStats.count, 0);
@@ -886,7 +887,7 @@ function logResults(results: CombatantStats[]) {
     console.log('Total Critical Hits:', totalCriticalHits);
     console.log('Average Damage:', Number((totalDamage / totalAttacks).toFixed(3)));
     console.log('Average Damage Given:', Number((totalDamageGiven / totalAttacks).toFixed(3)));
-}
+};
 
 for (let i = 0; i < 2; i++) {
     console.log(`${capitalise(battleResults[i].character?.name)} Stats`);
