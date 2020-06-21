@@ -1,7 +1,10 @@
-interface Actor {
+interface CoreStats {
     intelligence: number;
     strength: number;
     dexterity: number;
+}
+
+interface Actor extends CoreStats {
     mainHand: Weapon;
     offHand: Weapon | Shield;
     armour: Armour;
@@ -118,6 +121,41 @@ interface Character {
     actor: Actor;
     wins: number;
     losses: number;
+}
+
+interface BattleResults {
+    character?: Character;
+    results: CombatantStats[];
+}
+
+interface CombatantStats {
+    attackRateStats: AttackRateStats,
+    dodgeStats: DodgeCheckStats,
+    blockStats: BlockCheckStats
+}
+
+interface CheckStats {
+    name: string,
+    count: number,
+    successCount: number,
+    successRate: number
+}
+
+interface AttackRateStats extends CheckStats {
+    totalDamage: number;
+    averageDamage: number;
+    totalDamageGiven: number;
+    averageDamageGiven: number;
+    criticalHitSuccessRate: number;
+    criticalHitSuccessCount: number
+}
+
+interface DodgeCheckStats extends CheckStats {
+
+}
+
+interface BlockCheckStats extends CheckStats {
+
 }
 
 const capitalise = (str?: string) => str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
@@ -376,6 +414,10 @@ const battle = (characterOne: Character, characterTwo: Character) => {
             if (defender.health <= 0) {
                 winner = attacker.character.name;
                 attacker.character.wins += 1;
+                attacker.character.experience += 200;
+                defender.character.experience += 75;
+                attacker.character.gold += 10;
+                defender.character.gold += 5;
                 defender.character.losses += 1;
                 console.log(`${attacker.character.name} wins`);
                 console.log(`${attacker.character.name} health: ${attacker.health}`);
@@ -576,8 +618,8 @@ const actorOne: Actor = {
 }
 
 const actorTwo: Actor = {
-    intelligence: 40,
-    strength: 70,
+    intelligence: 45,
+    strength: 65,
     dexterity: 40,
     mainHand: broadSword,
     offHand: dagger,
@@ -658,18 +700,24 @@ const characterFive: Character = {
 
 const characters = [characterOne, characterTwo, characterThree, characterFour, characterFive]
 
-const battleResults: { characterOne?: Character; characterTwo?: Character; results: any[] } = {
-    characterOne: characters[0],
-    characterTwo: characters[1],
-    results: []
-}
 
-for (let i = 0; i < 100; i++) {
+const battleResults: BattleResults[] = [
+    {
+        character: characters[0],
+        results: []
+    },
+    {
+        character: characters[1],
+        results: []
+    }
+]
+
+for (let i = 0; i < 1000; i++) {
     const [combatantOne, combatantTwo] = battle(characterOne, characterTwo);
 
     console.log('\n####################\n');
 
-    const attackRateStats = (combatant: Combatant) => {
+    const getAttackRateStats = (combatant: Combatant): AttackRateStats => {
         const name = combatant.character.name;
         const count = combatant.roundStats.attacks.length;
         const successCount = combatant.roundStats.attacks.filter(a => a.isSuccessful).length;
@@ -694,16 +742,15 @@ for (let i = 0; i < 100; i++) {
         };
     };
 
-
-    const dodgeStats = (combatant: Combatant) => {
-        const name = combatant.character.name;
-        const count = combatant.roundStats.dodges.length;
-        const successCount = combatant.roundStats.dodges.filter(d => d.isSuccessful).length;
+    const dodgeStats = (defender: Combatant): DodgeCheckStats => {
+        const name = defender.character.name;
+        const count = defender.roundStats.dodges.length;
+        const successCount = defender.roundStats.dodges.filter(d => d.isSuccessful).length;
         const successRate = Number((successCount / count).toFixed(3));
         return {name, count, successCount, successRate}
     }
 
-    const blockStats = (combatant: Combatant) => {
+    const blockStats = (combatant: Combatant): BlockCheckStats => {
         const name = combatant.character.name;
         const count = combatant.roundStats.blocks.length;
         const successCount = combatant.roundStats.blocks.filter(b => b.isSuccessful).length;
@@ -711,47 +758,51 @@ for (let i = 0; i < 100; i++) {
         return {name, count, successCount, successRate: !isNaN(successRate) ? successRate : 0}
     }
 
-    const combatantOneStats = {
-        attackRateStats: attackRateStats(combatantOne),
+    const combatantOneStats: CombatantStats = {
+        attackRateStats: getAttackRateStats(combatantOne),
         dodgeStats: dodgeStats(combatantOne),
         blockStats: blockStats(combatantOne)
     };
 
-    const combatantTwoStats = {
-        attackRateStats: attackRateStats(combatantTwo),
+    const combatantTwoStats: CombatantStats = {
+        attackRateStats: getAttackRateStats(combatantTwo),
         dodgeStats: dodgeStats(combatantTwo),
         blockStats: blockStats(combatantTwo)
     };
 
-    const battleStats = {
-        combatantOneStats: combatantOneStats,
-        combatantTwoStats: combatantTwoStats
-    }
-    battleResults.results.push(battleStats);
+    battleResults[0].results.push(combatantOneStats);
+    battleResults[1].results.push(combatantTwoStats);
 }
 
-console.log(`${capitalise(battleResults.characterOne?.name)} vs ${capitalise(battleResults.characterTwo?.name)}`);
-console.log('\n================\n');
+const logCharacterStats = (character: Character | undefined) => {
+    console.log('Wins: ', character?.wins);
+    console.log('Losses: ', character?.losses);
+    console.log('Exp: ', character?.experience);
+    console.log('Gold: ', character?.gold);
+};
 
-console.log(`${capitalise(battleResults.characterOne?.name)} Stats`);
-console.log('----------------');
-console.log('Wins: ', battleResults.characterOne?.wins);
-console.log('Losses: ', battleResults.characterOne?.losses);
-console.log('Total Damage: ', battleResults.results
-    .reduce((count: number, r) => count += r.combatantOneStats.attackRateStats.totalDamage, 0));
-console.log('Total Damage Given: ', battleResults.results
-    .reduce((count: number, r) => count += r.combatantOneStats.attackRateStats.totalDamageGiven, 0));
+console.log(`${capitalise(battleResults[0].character?.name)} vs ${capitalise(battleResults[1].character?.name)}`);
+console.log('================\n');
 
-console.log('\n++++++++++++++++\n');
+function logResults(results: CombatantStats[]) {
+    const totalDamage = results.reduce((count: number, r) => count += r.attackRateStats.totalDamage, 0);
+    const totalDamageGiven = results.reduce((count: number, r) => count += r.attackRateStats.totalDamageGiven, 0);
+    const totalAttacks = results.reduce((count: number, r) => count += r.attackRateStats.count, 0);
+    const totalSuccessfulAttacks = results.reduce((count: number, r) => count += r.attackRateStats.successCount, 0);
+    const totalCriticalHits = results.reduce((count: number, r) => count += r.attackRateStats.criticalHitSuccessCount, 0);
+    console.log('Total Damage:', totalDamage);
+    console.log('Total Damage Given:', totalDamageGiven);
+    console.log('Total Attacks:', totalAttacks);
+    console.log('Total Successful Attacks:', totalSuccessfulAttacks);
+    console.log('Total Critical Hits:', totalCriticalHits);
+    console.log('Average Damage:', Number((totalDamage / totalAttacks).toFixed(3)));
+    console.log('Average Damage Given:', Number((totalDamageGiven / totalAttacks).toFixed(3)));
+}
 
-console.log(`${capitalise(battleResults.characterTwo?.name)} Stats`);
-console.log('----------------');
-console.log('Wins: ', battleResults.characterTwo?.wins);
-console.log('Losses: ', battleResults.characterTwo?.losses);
-console.log('Total Damage: ', battleResults.results
-    .reduce((count: number, r) => count += r.combatantTwoStats.attackRateStats.totalDamage, 0));
-console.log('Total Damage Given: ', battleResults.results
-    .reduce((count: number, r) => count += r.combatantTwoStats.attackRateStats.totalDamageGiven, 0));
-
-console.log('\n~~~~~~~~~~~~~~~~\n');
-
+for (let i = 0; i < 2; i++) {
+    console.log(`${capitalise(battleResults[i].character?.name)} Stats`);
+    console.log('::::::::::::::::');
+    logCharacterStats(battleResults[i].character);
+    logResults(battleResults[i].results);
+    console.log('\n~~~~~~~~~~~~~~~~\n');
+}
