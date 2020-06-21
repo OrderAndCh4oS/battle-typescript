@@ -407,15 +407,15 @@ const getRoundAttackerDefender = (combatantOne: Combatant, combatantTwo: Combata
         ? [combatantOne, combatantTwo]
         : [combatantTwo, combatantOne];
 
-function blockCheck(defender: Combatant) {
+const blockCheck = (defender: Combatant) => {
     const blockRoll = getRoll();
     const blockChance = "blockChance" in defender.character.actor.offHand
         ? 100 - defender.character.actor.offHand.blockChance
         : 0;
     return {blockRoll, blockChance};
-}
+};
 
-function attack(attacker: Combatant, defender: Combatant, weapon: Weapon, hand: 'mainHand' | 'offHand') {
+const attack = (attacker: Combatant, defender: Combatant, weapon: Weapon, hand: 'mainHand' | 'offHand') => {
     const {hitChance, hitRoll, isHit, baseHitChance, weightHitChanceReduction} = performAttack(attacker, defender);
     console.log(`${attacker.character.name} attack roll: required ${hitChance}, rolled ${hitRoll}`);
     console.log(isHit ? 'Hit success' : 'Missed');
@@ -459,7 +459,19 @@ function attack(attacker: Combatant, defender: Combatant, weapon: Weapon, hand: 
 
     attacker.roundStats.attacks.push(attackStats);
     defender.roundStats.dodges.push(dodgeStats);
-}
+};
+
+const handleBattleEnd = (attacker: Combatant, defender: Combatant) => {
+    attacker.character.wins += 1;
+    attacker.character.experience += 200;
+    defender.character.experience += 75;
+    attacker.character.gold += 10;
+    defender.character.gold += 5;
+    defender.character.losses += 1;
+    console.log(`${attacker.character.name} wins`);
+    console.log(`${attacker.character.name} health: ${attacker.health}`);
+    console.log(`${defender.character.name} health: ${defender.health}`);
+};
 
 const battle = (characterOne: Character, characterTwo: Character) => {
     let combatantOne = makeCombatant(characterOne),
@@ -482,16 +494,7 @@ const battle = (characterOne: Character, characterTwo: Character) => {
             attack(attacker, defender, weapon, 'offHand');
         }
         if (defender.health <= 0) {
-            winner = attacker.character.name;
-            attacker.character.wins += 1;
-            attacker.character.experience += 200;
-            defender.character.experience += 75;
-            attacker.character.gold += 10;
-            defender.character.gold += 5;
-            defender.character.losses += 1;
-            console.log(`${attacker.character.name} wins`);
-            console.log(`${attacker.character.name} health: ${attacker.health}`);
-            console.log(`${defender.character.name} health: ${defender.health}`);
+            handleBattleEnd(attacker, defender);
             break;
         }
 
@@ -555,6 +558,14 @@ const shortSword: Weapon = {
     price: 40
 }
 
+const shortSpear: Weapon = {
+    name: 'shortSpear',
+    edge: EdgeType.pierce,
+    damage: 35,
+    weight: 25,
+    price: 40
+}
+
 const sabre: Weapon = {
     name: 'sabre',
     edge: EdgeType.slash,
@@ -579,14 +590,6 @@ const broadSword: Weapon = {
     price: 60
 }
 
-const shortSpear: Weapon = {
-    name: 'shortSpear',
-    edge: EdgeType.pierce,
-    damage: 35,
-    weight: 25,
-    price: 40
-}
-
 const mace: Weapon = {
     name: 'mace',
     edge: EdgeType.blunt,
@@ -598,8 +601,8 @@ const mace: Weapon = {
 const flail: Weapon = {
     name: 'flail',
     edge: EdgeType.blunt,
-    damage: 50,
-    weight: 21,
+    damage: 40,
+    weight: 18,
     price: 60
 }
 
@@ -692,12 +695,12 @@ const plate: Armour = {
 }
 
 const actorOne: Actor = {
-    intelligence: 30,
+    intelligence: 40,
     strength: 50,
-    dexterity: 70,
-    mainHand: axe,
+    dexterity: 60,
+    mainHand: shortSpear,
     offHand: buckler,
-    armour: studdedLeatherArmour,
+    armour: leatherArmour,
 }
 
 const actorTwo: Actor = {
