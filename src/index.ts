@@ -17,12 +17,11 @@ enum EdgeType {
 }
 
 enum ArmourType {
-    cloth,
-    quiltPadding,
-    leather,
-    studdedLeather,
-    mail,
-    plate
+    none, // armour reduction 0
+    padded, // armour reduction effectiveness blunt: 100%, slash: 80%, pierce: 50%
+    leather, // armour reduction effectiveness blunt: 85%, slash: 100%, pierce: 66%
+    mail, // armour reduction effectiveness blunt: 90%, slash: 100%, pierce: 75%
+    plate// armour reduction effectiveness blunt: 95%, slash: 100%, pierce: 85%
 }
 
 interface Weapon {
@@ -309,13 +308,13 @@ const getDamage = (attacker: Combatant, defender: Combatant) => {
     const criticalHitChance = getCriticalHitChance(attacker.character, defender.character);
     const criticalHitRoll = getRoll();
     const isCriticalHit = criticalHitRoll > criticalHitChance;
-    let damage = getBaseDamage(attacker.character, attacker.character);
+    let damage = getBaseDamage(attacker.character);
     damage += isCriticalHit ? damage / 2 : 0;
     damage = Math.round(damage);
     return {criticalHitChance, criticalHitRoll, isCriticalHit, damage}
 }
 
-const getBaseDamage = (attacker: Character, defender: Character) => {
+const getBaseDamage = (attacker: Character) => {
     // Todo: handle variations between armour/weapon types
     const baseDamage = attacker.actor.mainHand.damage + ("damage" in attacker.actor.offHand ? attacker.actor.offHand.damage : 0) + attacker.actor.strength / 5;
     return baseDamage - (Math.random() * baseDamage / ("damage" in attacker.actor.offHand ? 4 : 5));
@@ -564,7 +563,7 @@ const cloth: Armour = {
     name: 'cloth',
     value: 0,
     weight: 1,
-    material: ArmourType.cloth,
+    material: ArmourType.none,
     price: 0,
 }
 
@@ -572,7 +571,7 @@ const quiltPadding: Armour = {
     name: 'quiltPadding',
     value: 2,
     weight: 3,
-    material: ArmourType.quiltPadding,
+    material: ArmourType.padded,
     price: 10,
 }
 
@@ -588,7 +587,7 @@ const studdedLeatherArmour: Armour = {
     name: 'studdedLeatherArmour',
     value: 7,
     weight: 11,
-    material: ArmourType.studdedLeather,
+    material: ArmourType.leather,
     price: 20
 }
 
@@ -710,7 +709,7 @@ const battleResults: BattleResults[] = [
         character: characters[1],
         results: []
     }
-]
+];
 
 for (let i = 0; i < 1000; i++) {
     const [combatantOne, combatantTwo] = battle(characterOne, characterTwo);
